@@ -1,61 +1,45 @@
-﻿using ReactiveUI;
-using System.Reactive.Disposables;
-using System.Windows;
-using v2rayN.Mode;
-using v2rayN.ViewModels;
+namespace v2rayN.Views;
 
-namespace v2rayN.Views
+public partial class SubEditWindow
 {
-    public partial class SubEditWindow
+    public SubEditWindow()
     {
-        public SubEditWindow(SubItem subItem)
+        InitializeComponent();
+
+        Loaded += Window_Loaded;
+
+        cmbConvertTarget.ItemsSource = Global.SubConvertTargets;
+        cmbPreResolve.ItemsSource = Global.DomainDNS4PreResolveAddress;
+        cmbCustomCoreType.ItemsSource = Utils.GetEnumNames<ECoreType>().Where(t => t != nameof(ECoreType.v2rayN)).ToList().AppendEmpty();
+
+        this.WhenActivated(disposables =>
         {
-            InitializeComponent();
+            this.Bind(ViewModel, vm => vm.SelectedSource.Remarks, v => v.txtRemarks.Text).DisposeWith(disposables);
+            this.Bind(ViewModel, vm => vm.SelectedSource.Url, v => v.txtUrl.Text).DisposeWith(disposables);
+            this.Bind(ViewModel, vm => vm.SelectedSource.MoreUrl, v => v.txtMoreUrl.Text).DisposeWith(disposables);
+            this.Bind(ViewModel, vm => vm.SelectedSource.Enabled, v => v.togEnable.IsChecked).DisposeWith(disposables);
+            this.Bind(ViewModel, vm => vm.SelectedSource.AutoUpdateInterval, v => v.txtAutoUpdateInterval.Text).DisposeWith(disposables);
+            this.Bind(ViewModel, vm => vm.SelectedSource.UserAgent, v => v.txtUserAgent.Text).DisposeWith(disposables);
+            this.Bind(ViewModel, vm => vm.SelectedSource.RequestHeaders, v => v.txtRequestHeaders.Text).DisposeWith(disposables);
+            this.Bind(ViewModel, vm => vm.SelectedSource.Sort, v => v.txtSort.Text).DisposeWith(disposables);
+            this.Bind(ViewModel, vm => vm.SelectedSource.Filter, v => v.txtFilter.Text).DisposeWith(disposables);
+            this.Bind(ViewModel, vm => vm.SelectedSource.ConvertTarget, v => v.cmbConvertTarget.Text).DisposeWith(disposables);
+            this.Bind(ViewModel, vm => vm.PrevProfile, v => v.txtPrevProfile.Text).DisposeWith(disposables);
+            this.Bind(ViewModel, vm => vm.NextProfile, v => v.txtNextProfile.Text).DisposeWith(disposables);
+            this.Bind(ViewModel, vm => vm.SelectedSource.PreSocksPort, v => v.txtPreSocksPort.Text).DisposeWith(disposables);
+            this.Bind(ViewModel, vm => vm.SelectedSource.Memo, v => v.txtMemo.Text).DisposeWith(disposables);
+            this.Bind(ViewModel, vm => vm.CustomCoreType, v => v.cmbCustomCoreType.Text).DisposeWith(disposables);
+            this.Bind(ViewModel, vm => vm.SelectedSource.PreResolver, v => v.cmbPreResolve.Text).DisposeWith(disposables);
 
-            // 设置窗口的尺寸不大于屏幕的尺寸
-            if (this.Width > SystemParameters.WorkArea.Width)
-            {
-                this.Width = SystemParameters.WorkArea.Width;
-            }
-            if (this.Height > SystemParameters.WorkArea.Height)
-            {
-                this.Height = SystemParameters.WorkArea.Height;
-            }
+            this.BindCommand(ViewModel, vm => vm.SelectPrevProfileCmd, v => v.btnSelectPrevProfile).DisposeWith(disposables);
+            this.BindCommand(ViewModel, vm => vm.SelectNextProfileCmd, v => v.btnSelectNextProfile).DisposeWith(disposables);
+            this.BindCommand(ViewModel, vm => vm.SaveCmd, v => v.btnSave).DisposeWith(disposables);
+        });
+        WindowsUtils.SetDarkBorder(this, ConfigTextHandler.Config.UiItem.CurrentTheme);
+    }
 
-            this.Owner = Application.Current.MainWindow;
-            this.Loaded += Window_Loaded;
-
-            ViewModel = new SubEditViewModel(subItem, this);
-
-            Global.SubConvertTargets.ForEach(it =>
-            {
-                cmbConvertTarget.Items.Add(it);
-            });
-
-            this.WhenActivated(disposables =>
-            {
-                this.Bind(ViewModel, vm => vm.SelectedSource.remarks, v => v.txtRemarks.Text).DisposeWith(disposables);
-                this.Bind(ViewModel, vm => vm.SelectedSource.url, v => v.txtUrl.Text).DisposeWith(disposables);
-                this.Bind(ViewModel, vm => vm.SelectedSource.moreUrl, v => v.txtMoreUrl.Text).DisposeWith(disposables);
-                this.Bind(ViewModel, vm => vm.SelectedSource.enabled, v => v.togEnable.IsChecked).DisposeWith(disposables);
-                this.Bind(ViewModel, vm => vm.SelectedSource.autoUpdateInterval, v => v.txtAutoUpdateInterval.Text).DisposeWith(disposables);
-                this.Bind(ViewModel, vm => vm.SelectedSource.userAgent, v => v.txtUserAgent.Text).DisposeWith(disposables);
-                this.Bind(ViewModel, vm => vm.SelectedSource.sort, v => v.txtSort.Text).DisposeWith(disposables);
-                this.Bind(ViewModel, vm => vm.SelectedSource.filter, v => v.txtFilter.Text).DisposeWith(disposables);
-                this.Bind(ViewModel, vm => vm.SelectedSource.convertTarget, v => v.cmbConvertTarget.Text).DisposeWith(disposables);
-
-                this.BindCommand(ViewModel, vm => vm.SaveCmd, v => v.btnSave).DisposeWith(disposables);
-            });
-        }
-
-        private void Window_Loaded(object sender, RoutedEventArgs e)
-        {
-            txtRemarks.Focus();
-        }
-
-        private void btnCancel_Click(object sender, RoutedEventArgs e)
-        {
-            this.Close();
-        }
+    private void Window_Loaded(object sender, RoutedEventArgs e)
+    {
+        txtRemarks.Focus();
     }
 }

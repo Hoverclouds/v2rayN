@@ -1,27 +1,25 @@
-﻿using System.Windows.Media;
-using v2rayN.Handler;
+using System.Windows.Media;
 
-namespace v2rayN.Converters
+namespace v2rayN.Converters;
+
+public class MaterialDesignFonts
 {
-    public class MaterialDesignFonts
-    {
-        public static FontFamily MyFont { get; }
+    public static FontFamily MyFont { get; }
 
-        static MaterialDesignFonts()
+    static MaterialDesignFonts()
+    {
+        try
         {
-            try
+            var fontFamily = ConfigTextHandler.Config.UiItem.CurrentFontFamily;
+            if (fontFamily.IsNotEmpty())
             {
-                var fontFamily = LazyConfig.Instance.GetConfig().uiItem.currentFontFamily;
-                if (!string.IsNullOrEmpty(fontFamily))
-                {
-                    var fontPath = Utils.GetFontsPath();
-                    MyFont = new FontFamily(new Uri(@$"file:///{fontPath}\"), $"./#{fontFamily}");
-                }
+                var fontPath = Utils.GetFontsPath();
+                MyFont = new FontFamily(new Uri(@$"file:///{fontPath}\"), $"./#{fontFamily}");
             }
-            catch
-            {
-            }
-            MyFont ??= new FontFamily("Microsoft YaHei");
         }
+        catch
+        {
+        }
+        MyFont ??= new FontFamily("Microsoft YaHei");
     }
 }

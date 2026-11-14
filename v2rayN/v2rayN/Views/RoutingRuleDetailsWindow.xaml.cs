@@ -1,95 +1,84 @@
-﻿using ReactiveUI;
-using System.Reactive.Disposables;
-using System.Windows;
-using v2rayN.Base;
-using v2rayN.Mode;
-using v2rayN.ViewModels;
+namespace v2rayN.Views;
 
-namespace v2rayN.Views
+public partial class RoutingRuleDetailsWindow
 {
-    public partial class RoutingRuleDetailsWindow
+    public RoutingRuleDetailsWindow()
     {
-        public RoutingRuleDetailsWindow(RulesItem rulesItem)
+        InitializeComponent();
+
+        Loaded += Window_Loaded;
+        clbProtocol.SelectionChanged += ClbProtocol_SelectionChanged;
+        clbInboundTag.SelectionChanged += ClbInboundTag_SelectionChanged;
+
+        cmbOutboundTag.ItemsSource = Global.OutboundTags;
+        clbProtocol.ItemsSource = Global.RuleProtocols;
+        clbInboundTag.ItemsSource = Global.InboundTags;
+        cmbNetwork.ItemsSource = Global.RuleNetworks;
+        cmbRuleType.ItemsSource = Utils.GetEnumNames<ERuleType>().AppendEmpty();
+
+        this.WhenActivated(disposables =>
         {
-            InitializeComponent();
+            this.WhenAnyValue(v => v.ViewModel.SelectedSource)
+                .KeepNotNull()
+                .Subscribe(InitializeData)
+                .DisposeWith(disposables);
 
-            // 设置窗口的尺寸不大于屏幕的尺寸
-            if (this.Width > SystemParameters.WorkArea.Width)
-            {
-                this.Width = SystemParameters.WorkArea.Width;
-            }
-            if (this.Height > SystemParameters.WorkArea.Height)
-            {
-                this.Height = SystemParameters.WorkArea.Height;
-            }
+            this.Bind(ViewModel, vm => vm.Remarks, v => v.txtRemarks.Text).DisposeWith(disposables);
+            this.Bind(ViewModel, vm => vm.OutboundTag, v => v.cmbOutboundTag.Text).DisposeWith(disposables);
+            this.Bind(ViewModel, vm => vm.Port, v => v.txtPort.Text).DisposeWith(disposables);
+            this.Bind(ViewModel, vm => vm.Network, v => v.cmbNetwork.Text).DisposeWith(disposables);
+            this.Bind(ViewModel, vm => vm.Enabled, v => v.togEnabled.IsChecked).DisposeWith(disposables);
+            this.Bind(ViewModel, vm => vm.Domain, v => v.txtDomain.Text).DisposeWith(disposables);
+            this.Bind(ViewModel, vm => vm.IP, v => v.txtIP.Text).DisposeWith(disposables);
+            this.Bind(ViewModel, vm => vm.Process, v => v.txtProcess.Text).DisposeWith(disposables);
+            this.Bind(ViewModel, vm => vm.AutoSort, v => v.chkAutoSort.IsChecked).DisposeWith(disposables);
+            this.Bind(ViewModel, vm => vm.RuleType, v => v.cmbRuleType.Text).DisposeWith(disposables);
 
-            this.Owner = Application.Current.MainWindow;
-            this.Loaded += Window_Loaded;
-            clbProtocol.SelectionChanged += ClbProtocol_SelectionChanged;
-            clbInboundTag.SelectionChanged += ClbInboundTag_SelectionChanged;
+            this.BindCommand(ViewModel, vm => vm.SelectProfileCmd, v => v.btnSelectProfile).DisposeWith(disposables);
+            this.BindCommand(ViewModel, vm => vm.SaveCmd, v => v.btnSave).DisposeWith(disposables);
+        });
+        WindowsUtils.SetDarkBorder(this, ConfigTextHandler.Config.UiItem.CurrentTheme);
+    }
 
-            ViewModel = new RoutingRuleDetailsViewModel(rulesItem, this);
-            cmbOutboundTag.Items.Add(Global.agentTag);
-            cmbOutboundTag.Items.Add(Global.directTag);
-            cmbOutboundTag.Items.Add(Global.blockTag);
-            Global.Protocols.ForEach(it =>
-            {
-                clbProtocol.Items.Add(it);
-            });
-            Global.InboundTags.ForEach(it =>
-            {
-                clbInboundTag.Items.Add(it);
-            });
-
-            if (!rulesItem.id.IsNullOrEmpty())
-            {
-                rulesItem.protocol?.ForEach(it =>
-                {
-                    clbProtocol.SelectedItems.Add(it);
-                });
-                rulesItem.inboundTag?.ForEach(it =>
-                {
-                    clbInboundTag.SelectedItems.Add(it);
-                });
-            }
-
-            this.WhenActivated(disposables =>
-            {
-                this.Bind(ViewModel, vm => vm.SelectedSource.outboundTag, v => v.cmbOutboundTag.Text).DisposeWith(disposables);
-                this.Bind(ViewModel, vm => vm.SelectedSource.port, v => v.txtPort.Text).DisposeWith(disposables);
-                this.Bind(ViewModel, vm => vm.SelectedSource.enabled, v => v.togEnabled.IsChecked).DisposeWith(disposables);
-                this.Bind(ViewModel, vm => vm.Domain, v => v.txtDomain.Text).DisposeWith(disposables);
-                this.Bind(ViewModel, vm => vm.IP, v => v.txtIP.Text).DisposeWith(disposables);
-                this.Bind(ViewModel, vm => vm.Process, v => v.txtProcess.Text).DisposeWith(disposables);
-                this.Bind(ViewModel, vm => vm.AutoSort, v => v.chkAutoSort.IsChecked).DisposeWith(disposables);
-
-                this.BindCommand(ViewModel, vm => vm.SaveCmd, v => v.btnSave).DisposeWith(disposables);
-            });
-        }
-
-        private void Window_Loaded(object sender, RoutedEventArgs e)
+    private void InitializeData(RulesItem rulesItem)
+    {
+        if (rulesItem.Id.IsNullOrEmpty())
         {
-            cmbOutboundTag.Focus();
+            return;
         }
+        rulesItem.Protocol?.ForEach(it =>
+        {
+            clbProtocol.SelectedItems.Add(it);
+        });
+        rulesItem.InboundTag?.ForEach(it =>
+        {
+            clbInboundTag.SelectedItems.Add(it);
+        });
+    }
 
-        private void ClbProtocol_SelectionChanged(object sender, System.Windows.Controls.SelectionChangedEventArgs e)
+    private void Window_Loaded(object sender, RoutedEventArgs e)
+    {
+        txtRemarks.Focus();
+    }
+
+    private void ClbProtocol_SelectionChanged(object sender, System.Windows.Controls.SelectionChangedEventArgs e)
+    {
+        if (ViewModel != null)
         {
             ViewModel.ProtocolItems = clbProtocol.SelectedItems.Cast<string>().ToList();
         }
+    }
 
-        private void ClbInboundTag_SelectionChanged(object sender, System.Windows.Controls.SelectionChangedEventArgs e)
+    private void ClbInboundTag_SelectionChanged(object sender, System.Windows.Controls.SelectionChangedEventArgs e)
+    {
+        if (ViewModel != null)
         {
             ViewModel.InboundTagItems = clbInboundTag.SelectedItems.Cast<string>().ToList();
         }
+    }
 
-        private void btnCancel_Click(object sender, RoutedEventArgs e)
-        {
-            this.Close();
-        }
-
-        private void linkRuleobjectDoc_Click(object sender, RoutedEventArgs e)
-        {
-            Utils.ProcessStart("https://www.v2fly.org/config/routing.html#ruleobject");
-        }
+    private void linkRuleobjectDoc_Click(object sender, RoutedEventArgs e)
+    {
+        ProcUtils.ProcessStart("https://xtls.github.io/config/routing.html#ruleobject");
     }
 }

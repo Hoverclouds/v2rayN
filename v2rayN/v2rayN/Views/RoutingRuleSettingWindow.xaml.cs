@@ -1,141 +1,177 @@
-﻿using Microsoft.Win32;
-using ReactiveUI;
-using System.Reactive.Disposables;
-using System.Windows;
-using System.Windows.Input;
-using v2rayN.Mode;
-using v2rayN.ViewModels;
+namespace v2rayN.Views;
 
-namespace v2rayN.Views
+public partial class RoutingRuleSettingWindow
 {
-    public partial class RoutingRuleSettingWindow
+    public RoutingRuleSettingWindow()
     {
-        public RoutingRuleSettingWindow(RoutingItem routingItem)
+        InitializeComponent();
+
+        Loaded += Window_Loaded;
+        PreviewKeyDown += RoutingRuleSettingWindow_PreviewKeyDown;
+        lstRules.SelectionChanged += lstRules_SelectionChanged;
+        lstRules.MouseDoubleClick += LstRules_MouseDoubleClick;
+        menuRuleSelectAll.Click += menuRuleSelectAll_Click;
+        btnBrowseCustomIcon.Click += btnBrowseCustomIcon_Click;
+        btnBrowseCustomRulesetPath4Singbox.Click += btnBrowseCustomRulesetPath4Singbox_Click;
+
+        cmbdomainStrategy.ItemsSource = Global.DomainStrategies.AppendEmpty();
+        cmbdomainStrategy4Singbox.ItemsSource = Global.DomainStrategies4Sbox;
+
+        this.WhenActivated(disposables =>
         {
-            InitializeComponent();
+            this.OneWayBind(ViewModel, vm => vm.RulesItems, v => v.lstRules.ItemsSource).DisposeWith(disposables);
+            this.Bind(ViewModel, vm => vm.SelectedSource, v => v.lstRules.SelectedItem).DisposeWith(disposables);
 
-            // 设置窗口的尺寸不大于屏幕的尺寸
-            if (this.Width > SystemParameters.WorkArea.Width)
+            this.Bind(ViewModel, vm => vm.SelectedRouting.Remarks, v => v.txtRemarks.Text).DisposeWith(disposables);
+            this.Bind(ViewModel, vm => vm.SelectedRouting.DomainStrategy, v => v.cmbdomainStrategy.Text).DisposeWith(disposables);
+            this.Bind(ViewModel, vm => vm.SelectedRouting.DomainStrategy4Singbox, v => v.cmbdomainStrategy4Singbox.Text).DisposeWith(disposables);
+
+            this.Bind(ViewModel, vm => vm.SelectedRouting.Url, v => v.txtUrl.Text).DisposeWith(disposables);
+            this.Bind(ViewModel, vm => vm.SelectedRouting.CustomIcon, v => v.txtCustomIcon.Text).DisposeWith(disposables);
+            this.Bind(ViewModel, vm => vm.SelectedRouting.CustomRulesetPath4Singbox, v => v.txtCustomRulesetPath4Singbox.Text).DisposeWith(disposables);
+            this.Bind(ViewModel, vm => vm.SelectedRouting.Sort, v => v.txtSort.Text).DisposeWith(disposables);
+
+            this.BindCommand(ViewModel, vm => vm.RuleAddCmd, v => v.menuRuleAdd).DisposeWith(disposables);
+            this.BindCommand(ViewModel, vm => vm.ImportRulesFromFileCmd, v => v.menuImportRulesFromFile).DisposeWith(disposables);
+            this.BindCommand(ViewModel, vm => vm.ImportRulesFromClipboardCmd, v => v.menuImportRulesFromClipboard).DisposeWith(disposables);
+            this.BindCommand(ViewModel, vm => vm.ImportRulesFromUrlCmd, v => v.menuImportRulesFromUrl).DisposeWith(disposables);
+
+            this.BindCommand(ViewModel, vm => vm.RuleAddCmd, v => v.menuRuleAdd2).DisposeWith(disposables);
+            this.BindCommand(ViewModel, vm => vm.RuleRemoveCmd, v => v.menuRuleRemove).DisposeWith(disposables);
+            this.BindCommand(ViewModel, vm => vm.RuleExportSelectedCmd, v => v.menuRuleExportSelected).DisposeWith(disposables);
+            this.BindCommand(ViewModel, vm => vm.MoveTopCmd, v => v.menuMoveTop).DisposeWith(disposables);
+            this.BindCommand(ViewModel, vm => vm.MoveUpCmd, v => v.menuMoveUp).DisposeWith(disposables);
+            this.BindCommand(ViewModel, vm => vm.MoveDownCmd, v => v.menuMoveDown).DisposeWith(disposables);
+            this.BindCommand(ViewModel, vm => vm.MoveBottomCmd, v => v.menuMoveBottom).DisposeWith(disposables);
+
+            this.BindCommand(ViewModel, vm => vm.SaveCmd, v => v.btnSave).DisposeWith(disposables);
+
+            ViewModel.ShowYesNoInteraction.RegisterHandler(interaction =>
             {
-                this.Width = SystemParameters.WorkArea.Width;
-            }
-            if (this.Height > SystemParameters.WorkArea.Height)
+                var message = interaction.Input;
+                var result = UI.ShowYesNo(message) != MessageBoxResult.No;
+                interaction.SetOutput(result);
+            }).DisposeWith(disposables);
+
+            ViewModel.SetClipboardDataInteraction.RegisterHandler(interaction =>
             {
-                this.Height = SystemParameters.WorkArea.Height;
-            }
+                var strData = interaction.Input;
+                WindowsUtils.SetClipboardData(strData);
+                interaction.SetOutput(RxVoid.Default);
+            }).DisposeWith(disposables);
 
-            this.Owner = Application.Current.MainWindow;
-            this.Loaded += Window_Loaded;
-            this.PreviewKeyDown += RoutingRuleSettingWindow_PreviewKeyDown;
-            lstRules.SelectionChanged += lstRules_SelectionChanged;
-            lstRules.MouseDoubleClick += LstRules_MouseDoubleClick;
-
-            ViewModel = new RoutingRuleSettingViewModel(routingItem, this);
-            Global.domainStrategys.ForEach(it =>
+            ViewModel.ReadTextFromClipboardInteraction.RegisterHandler(interaction =>
             {
-                cmbdomainStrategy.Items.Add(it);
-            });
-            cmbdomainStrategy.Items.Add(string.Empty);
-            Global.domainStrategys4Singbox.ForEach(it =>
+                var clipboardData = WindowsUtils.GetClipboardData();
+                interaction.SetOutput(clipboardData);
+            }).DisposeWith(disposables);
+
+            ViewModel.BrowseRulesFileInteraction.RegisterHandler(interaction =>
             {
-                cmbdomainStrategy4Singbox.Items.Add(it);
-            });
+                if (UI.OpenFileDialog(out var fileName, "Rules|*.json|All|*.*") != true)
+                {
+                    interaction.SetOutput(null);
+                    return;
+                }
+                interaction.SetOutput(fileName);
+            }).DisposeWith(disposables);
+        });
+        WindowsUtils.SetDarkBorder(this, ConfigTextHandler.Config.UiItem.CurrentTheme);
+    }
 
-            this.WhenActivated(disposables =>
-            {
-                this.OneWayBind(ViewModel, vm => vm.RulesItems, v => v.lstRules.ItemsSource).DisposeWith(disposables);
-                this.Bind(ViewModel, vm => vm.SelectedSource, v => v.lstRules.SelectedItem).DisposeWith(disposables);
+    private void Window_Loaded(object sender, RoutedEventArgs e)
+    {
+        txtRemarks.Focus();
+    }
 
-                this.Bind(ViewModel, vm => vm.SelectedRouting.remarks, v => v.txtRemarks.Text).DisposeWith(disposables);
-                this.Bind(ViewModel, vm => vm.SelectedRouting.domainStrategy, v => v.cmbdomainStrategy.Text).DisposeWith(disposables);
-                this.Bind(ViewModel, vm => vm.SelectedRouting.domainStrategy4Singbox, v => v.cmbdomainStrategy4Singbox.Text).DisposeWith(disposables);
-
-                this.Bind(ViewModel, vm => vm.SelectedRouting.url, v => v.txtUrl.Text).DisposeWith(disposables);
-                this.Bind(ViewModel, vm => vm.SelectedRouting.customIcon, v => v.txtCustomIcon.Text).DisposeWith(disposables);
-                this.Bind(ViewModel, vm => vm.SelectedRouting.sort, v => v.txtSort.Text).DisposeWith(disposables);
-
-                this.BindCommand(ViewModel, vm => vm.RuleAddCmd, v => v.menuRuleAdd).DisposeWith(disposables);
-                this.BindCommand(ViewModel, vm => vm.ImportRulesFromFileCmd, v => v.menuImportRulesFromFile).DisposeWith(disposables);
-                this.BindCommand(ViewModel, vm => vm.ImportRulesFromClipboardCmd, v => v.menuImportRulesFromClipboard).DisposeWith(disposables);
-                this.BindCommand(ViewModel, vm => vm.ImportRulesFromUrlCmd, v => v.menuImportRulesFromUrl).DisposeWith(disposables);
-
-                this.BindCommand(ViewModel, vm => vm.RuleAddCmd, v => v.menuRuleAdd2).DisposeWith(disposables);
-                this.BindCommand(ViewModel, vm => vm.RuleRemoveCmd, v => v.menuRuleRemove).DisposeWith(disposables);
-                this.BindCommand(ViewModel, vm => vm.RuleExportSelectedCmd, v => v.menuRuleExportSelected).DisposeWith(disposables);
-                this.BindCommand(ViewModel, vm => vm.MoveTopCmd, v => v.menuMoveTop).DisposeWith(disposables);
-                this.BindCommand(ViewModel, vm => vm.MoveUpCmd, v => v.menuMoveUp).DisposeWith(disposables);
-                this.BindCommand(ViewModel, vm => vm.MoveDownCmd, v => v.menuMoveDown).DisposeWith(disposables);
-                this.BindCommand(ViewModel, vm => vm.MoveBottomCmd, v => v.menuMoveBottom).DisposeWith(disposables);
-
-                this.BindCommand(ViewModel, vm => vm.SaveCmd, v => v.btnSave).DisposeWith(disposables);
-            });
+    private void RoutingRuleSettingWindow_PreviewKeyDown(object sender, KeyEventArgs e)
+    {
+        if (!lstRules.IsKeyboardFocusWithin)
+        {
+            return;
         }
 
-        private void Window_Loaded(object sender, RoutedEventArgs e)
+        if (Keyboard.IsKeyDown(Key.LeftCtrl) || Keyboard.IsKeyDown(Key.RightCtrl))
         {
-            txtRemarks.Focus();
-        }
-
-        private void RoutingRuleSettingWindow_PreviewKeyDown(object sender, KeyEventArgs e)
-        {
-            if (Keyboard.IsKeyDown(Key.LeftCtrl) || Keyboard.IsKeyDown(Key.RightCtrl))
+            if (e.Key == Key.A)
             {
-                if (e.Key == Key.A)
-                {
-                    lstRules.SelectAll();
-                }
-                else if (e.Key == Key.C)
-                {
-                    ViewModel?.RuleExportSelected();
-                }
+                lstRules.SelectAll();
             }
-            else
+            else if (e.Key == Key.C)
             {
-                if (e.Key == Key.T)
-                {
+                ViewModel?.RuleExportSelectedAsync();
+            }
+        }
+        else
+        {
+            switch (e.Key)
+            {
+                case Key.T:
                     ViewModel?.MoveRule(EMove.Top);
-                }
-                else if (e.Key == Key.U)
-                {
+                    break;
+
+                case Key.U:
                     ViewModel?.MoveRule(EMove.Up);
-                }
-                else if (e.Key == Key.D)
-                {
+                    break;
+
+                case Key.D:
                     ViewModel?.MoveRule(EMove.Down);
-                }
-                else if (e.Key == Key.B)
-                {
+                    break;
+
+                case Key.B:
                     ViewModel?.MoveRule(EMove.Bottom);
-                }
-                else if (e.Key == Key.Delete)
-                {
-                    ViewModel?.RuleRemove();
-                }
+                    break;
+
+                case Key.Delete:
+                case Key.Back:
+                    ViewModel?.RuleRemoveAsync();
+                    break;
             }
         }
+    }
 
-        private void lstRules_SelectionChanged(object sender, System.Windows.Controls.SelectionChangedEventArgs e)
+    private void lstRules_SelectionChanged(object sender, System.Windows.Controls.SelectionChangedEventArgs e)
+    {
+        if (ViewModel != null)
         {
             ViewModel.SelectedSources = lstRules.SelectedItems.Cast<RulesItemModel>().ToList();
         }
+    }
 
-        private void LstRules_MouseDoubleClick(object sender, MouseButtonEventArgs e)
+    private void LstRules_MouseDoubleClick(object sender, MouseButtonEventArgs e)
+    {
+        ViewModel?.RuleEditAsync(false);
+    }
+
+    private void menuRuleSelectAll_Click(object sender, System.Windows.RoutedEventArgs e)
+    {
+        lstRules.SelectAll();
+    }
+
+    private void btnBrowseCustomIcon_Click(object sender, System.Windows.RoutedEventArgs e)
+    {
+        if (UI.OpenFileDialog(out var fileName,
+            "PNG,ICO|*.png;*.ico") != true)
         {
-            ViewModel?.RuleEdit(false);
+            return;
         }
 
-        private void menuRuleSelectAll_Click(object sender, System.Windows.RoutedEventArgs e)
+        txtCustomIcon.Text = fileName;
+    }
+
+    private void btnBrowseCustomRulesetPath4Singbox_Click(object sender, RoutedEventArgs e)
+    {
+        if (UI.OpenFileDialog(out var fileName,
+              "Config|*.json|All|*.*") != true)
         {
-            lstRules.SelectAll();
+            return;
         }
 
-        private void btnBrowse_Click(object sender, System.Windows.RoutedEventArgs e)
-        {
-            var openFileDialog1 = new OpenFileDialog();
-            openFileDialog1.Filter = "PNG|*.png";
-            openFileDialog1.ShowDialog();
+        txtCustomRulesetPath4Singbox.Text = fileName;
+    }
 
-            txtCustomIcon.Text = openFileDialog1.FileName;
-        }
+    private void linkCustomRulesetPath4Singbox(object sender, RoutedEventArgs e)
+    {
+        ProcUtils.ProcessStart("https://github.com/2dust/v2rayCustomRoutingList/blob/master/singbox_custom_ruleset_example.json");
     }
 }

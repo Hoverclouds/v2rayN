@@ -1,68 +1,66 @@
-﻿using ReactiveUI;
-using System.Reactive.Disposables;
-using System.Windows;
-using v2rayN.Mode;
-using v2rayN.ViewModels;
+namespace v2rayN.Views;
 
-namespace v2rayN.Views
+public partial class AddServer2Window
 {
-    public partial class AddServer2Window
+    public AddServer2Window()
     {
-        public AddServer2Window(ProfileItem profileItem)
+        InitializeComponent();
+
+        Loaded += Window_Loaded;
+
+        cmbCoreType.ItemsSource = Utils.GetEnumNames<ECoreType>().Where(t => t != nameof(ECoreType.v2rayN)).ToList().AppendEmpty();
+
+        this.WhenActivated(disposables =>
         {
-            InitializeComponent();
+            this.WhenAnyValue(v => v.ViewModel.SelectedSource)
+                .KeepNotNull()
+                .Subscribe(InitializeData)
+                .DisposeWith(disposables);
 
-            // 设置窗口的尺寸不大于屏幕的尺寸
-            if (this.Width > SystemParameters.WorkArea.Width)
+            this.Bind(ViewModel, vm => vm.SelectedSource.Remarks, v => v.txtRemarks.Text).DisposeWith(disposables);
+            this.Bind(ViewModel, vm => vm.SelectedSource.Address, v => v.txtAddress.Text).DisposeWith(disposables);
+            this.Bind(ViewModel, vm => vm.CoreType, v => v.cmbCoreType.Text).DisposeWith(disposables);
+            this.Bind(ViewModel, vm => vm.SelectedSource.DisplayLog, v => v.togDisplayLog.IsChecked).DisposeWith(disposables);
+            this.Bind(ViewModel, vm => vm.SelectedSource.PreSocksPort, v => v.txtPreSocksPort.Text).DisposeWith(disposables);
+            this.Bind(ViewModel, vm => vm.IsSingboxEndpoint, v => v.togSingBoxEndpoint.IsChecked).DisposeWith(disposables);
+
+            this.BindCommand(ViewModel, vm => vm.BrowseServerCmd, v => v.btnBrowse).DisposeWith(disposables);
+            this.BindCommand(ViewModel, vm => vm.EditServerCmd, v => v.btnEdit).DisposeWith(disposables);
+            this.BindCommand(ViewModel, vm => vm.SaveServerCmd, v => v.btnSave).DisposeWith(disposables);
+
+            ViewModel.BrowseConfigFileInteraction.RegisterHandler(interaction =>
             {
-                this.Width = SystemParameters.WorkArea.Width;
-            }
-            if (this.Height > SystemParameters.WorkArea.Height)
-            {
-                this.Height = SystemParameters.WorkArea.Height;
-            }
+                if (UI.OpenFileDialog(out var fileName, "Config|*.json|YAML|*.yaml;*.yml|All|*.*") != true)
+                {
+                    interaction.SetOutput(null);
+                    return;
+                }
+                interaction.SetOutput(fileName);
+            }).DisposeWith(disposables);
+        });
+        WindowsUtils.SetDarkBorder(this, ConfigTextHandler.Config.UiItem.CurrentTheme);
+    }
 
-            this.Owner = Application.Current.MainWindow;
-            this.Loaded += Window_Loaded;
-            ViewModel = new AddServer2ViewModel(profileItem, this);
-
-            foreach (ECoreType it in Enum.GetValues(typeof(ECoreType)))
-            {
-                if (it == ECoreType.v2rayN)
-                    continue;
-                cmbCoreType.Items.Add(it.ToString());
-            }
-            cmbCoreType.Items.Add(string.Empty);
-
-            this.WhenActivated(disposables =>
-            {
-                this.Bind(ViewModel, vm => vm.SelectedSource.remarks, v => v.txtRemarks.Text).DisposeWith(disposables);
-                this.Bind(ViewModel, vm => vm.SelectedSource.address, v => v.txtAddress.Text).DisposeWith(disposables);
-                this.Bind(ViewModel, vm => vm.SelectedSource.coreType, v => v.cmbCoreType.Text).DisposeWith(disposables);
-                this.Bind(ViewModel, vm => vm.SelectedSource.displayLog, v => v.togDisplayLog.IsChecked).DisposeWith(disposables);
-                this.Bind(ViewModel, vm => vm.SelectedSource.preSocksPort, v => v.txtPreSocksPort.Text).DisposeWith(disposables);
-
-                this.BindCommand(ViewModel, vm => vm.BrowseServerCmd, v => v.btnBrowse).DisposeWith(disposables);
-                this.BindCommand(ViewModel, vm => vm.EditServerCmd, v => v.btnEdit).DisposeWith(disposables);
-                this.BindCommand(ViewModel, vm => vm.SaveServerCmd, v => v.btnSave).DisposeWith(disposables);
-            });
-        }
-
-        private void Window_Loaded(object sender, RoutedEventArgs e)
+    private void InitializeData(ProfileItem profileItem)
+    {
+        if (profileItem.ConfigType is EConfigType.Custom)
         {
-            txtRemarks.Focus();
+            Title = ResUI.menuAddCustomServer;
+            cmbCoreType.ItemsSource = Utils.GetEnumNames<ECoreType>().Where(t => t != nameof(ECoreType.v2rayN)).ToList();
+            gridCustomServer.Visibility = Visibility.Visible;
+            gridCustomOutbound.Visibility = Visibility.Collapsed;
         }
-
-        private void btnCancel_Click(object sender, System.Windows.RoutedEventArgs e)
+        else if (profileItem.ConfigType is EConfigType.Outbound)
         {
-            if (ViewModel?.IsModified == true)
-            {
-                this.DialogResult = true;
-            }
-            else
-            {
-                this.Close();
-            }
+            Title = ResUI.menuAddCustomOutboundServer;
+            cmbCoreType.ItemsSource = Global.CoreTypes;
+            gridCustomServer.Visibility = Visibility.Collapsed;
+            gridCustomOutbound.Visibility = Visibility.Visible;
         }
+    }
+
+    private void Window_Loaded(object sender, RoutedEventArgs e)
+    {
+        txtRemarks.Focus();
     }
 }

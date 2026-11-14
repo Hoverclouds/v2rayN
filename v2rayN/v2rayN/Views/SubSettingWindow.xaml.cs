@@ -1,76 +1,101 @@
-﻿using ReactiveUI;
-using System.ComponentModel;
-using System.Reactive.Disposables;
-using System.Windows;
-using System.Windows.Input;
-using v2rayN.Mode;
-using v2rayN.ViewModels;
+using MaterialDesignThemes.Wpf;
 
-namespace v2rayN.Views
+namespace v2rayN.Views;
+
+public partial class SubSettingWindow
 {
-    public partial class SubSettingWindow
+    public SubSettingWindow()
     {
-        public SubSettingWindow()
+        InitializeComponent();
+
+        Closing += SubSettingWindow_Closing;
+        lstSubscription.MouseDoubleClick += LstSubscription_MouseDoubleClick;
+        lstSubscription.SelectionChanged += LstSubscription_SelectionChanged;
+        menuClose.Click += menuClose_Click;
+
+        this.WhenActivated(disposables =>
         {
-            InitializeComponent();
+            this.OneWayBind(ViewModel, vm => vm.SubItems, v => v.lstSubscription.ItemsSource).DisposeWith(disposables);
+            this.Bind(ViewModel, vm => vm.SelectedSource, v => v.lstSubscription.SelectedItem).DisposeWith(disposables);
 
-            // 设置窗口的尺寸不大于屏幕的尺寸
-            if (this.Width > SystemParameters.WorkArea.Width)
+            this.BindCommand(ViewModel, vm => vm.SubAddCmd, v => v.menuSubAdd).DisposeWith(disposables);
+            this.BindCommand(ViewModel, vm => vm.SubDeleteCmd, v => v.menuSubDelete).DisposeWith(disposables);
+            this.BindCommand(ViewModel, vm => vm.SubEditCmd, v => v.menuSubEdit).DisposeWith(disposables);
+            this.BindCommand(ViewModel, vm => vm.SubShareCmd, v => v.menuSubShare).DisposeWith(disposables);
+
+            this.BindCommand(ViewModel, vm => vm.SubAddCmd, v => v.menuSubAdd2).DisposeWith(disposables);
+            this.BindCommand(ViewModel, vm => vm.SubDeleteCmd, v => v.menuSubDelete2).DisposeWith(disposables);
+            this.BindCommand(ViewModel, vm => vm.SubEditCmd, v => v.menuSubEdit2).DisposeWith(disposables);
+            this.BindCommand(ViewModel, vm => vm.SubShareCmd, v => v.menuSubShare2).DisposeWith(disposables);
+
+            ViewModel.ShowYesNoInteraction.RegisterHandler(interaction =>
             {
-                this.Width = SystemParameters.WorkArea.Width;
-            }
-            if (this.Height > SystemParameters.WorkArea.Height)
+                var message = interaction.Input;
+                var result = UI.ShowYesNo(message) != MessageBoxResult.No;
+                interaction.SetOutput(result);
+            }).DisposeWith(disposables);
+
+            ViewModel.ShareSubInteraction.RegisterHandler(async interaction =>
             {
-                this.Height = SystemParameters.WorkArea.Height;
-            }
+                var url = interaction.Input;
+                if (url.IsNullOrEmpty())
+                {
+                    interaction.SetOutput(RxVoid.Default);
+                    return;
+                }
+                await ShareSub(url);
+                interaction.SetOutput(RxVoid.Default);
+            }).DisposeWith(disposables);
+        });
+        WindowsUtils.SetDarkBorder(this, ConfigTextHandler.Config.UiItem.CurrentTheme);
+    }
 
-            this.Owner = Application.Current.MainWindow;
-
-            ViewModel = new SubSettingViewModel(this);
-            this.Closing += SubSettingWindow_Closing;
-            lstSubscription.MouseDoubleClick += LstSubscription_MouseDoubleClick;
-            lstSubscription.SelectionChanged += LstSubscription_SelectionChanged;
-
-            this.WhenActivated(disposables =>
-            {
-                this.OneWayBind(ViewModel, vm => vm.SubItems, v => v.lstSubscription.ItemsSource).DisposeWith(disposables);
-                this.Bind(ViewModel, vm => vm.SelectedSource, v => v.lstSubscription.SelectedItem).DisposeWith(disposables);
-
-                this.BindCommand(ViewModel, vm => vm.SubAddCmd, v => v.menuSubAdd).DisposeWith(disposables);
-                this.BindCommand(ViewModel, vm => vm.SubDeleteCmd, v => v.menuSubDelete).DisposeWith(disposables);
-                this.BindCommand(ViewModel, vm => vm.SubEditCmd, v => v.menuSubEdit).DisposeWith(disposables);
-                this.BindCommand(ViewModel, vm => vm.SubShareCmd, v => v.menuSubShare).DisposeWith(disposables);
-            });
-        }
-
-        private void SubSettingWindow_Closing(object? sender, CancelEventArgs e)
+    private async Task ShareSub(string url)
+    {
+        if (url.IsNullOrEmpty())
         {
-            if (ViewModel?.IsModified == true)
-            {
-                this.DialogResult = true;
-            }
+            return;
         }
-
-        private void LstSubscription_MouseDoubleClick(object sender, MouseButtonEventArgs e)
+        var img = QRCodeWindowsUtils.GetQRCode(url);
+        var dialog = new QrcodeView()
         {
-            ViewModel?.EditSub(false);
-        }
+            imgQrcode = { Source = img },
+            txtContent = { Text = url },
+        };
 
-        private void LstSubscription_SelectionChanged(object sender, System.Windows.Controls.SelectionChangedEventArgs e)
+        await DialogHost.Show(dialog, "SubDialog");
+    }
+
+    private void SubSettingWindow_Closing(object? sender, CancelEventArgs e)
+    {
+        if (ViewModel?.IsModified == true)
+        {
+            DialogResult = true;
+        }
+    }
+
+    private void LstSubscription_MouseDoubleClick(object sender, MouseButtonEventArgs e)
+    {
+        ViewModel?.EditSubAsync(false);
+    }
+
+    private void LstSubscription_SelectionChanged(object sender, System.Windows.Controls.SelectionChangedEventArgs e)
+    {
+        if (ViewModel != null)
         {
             ViewModel.SelectedSources = lstSubscription.SelectedItems.Cast<SubItem>().ToList();
         }
+    }
 
-        private void menuClose_Click(object sender, System.Windows.RoutedEventArgs e)
+    private void menuClose_Click(object sender, System.Windows.RoutedEventArgs e)
+    {
+        if (ViewModel?.IsModified == true)
         {
-            if (ViewModel?.IsModified == true)
-            {
-                this.DialogResult = true;
-            }
-            else
-            {
-                this.Close();
-            }
+            DialogResult = true;
+        }
+        else
+        {
+            Close();
         }
     }
 }

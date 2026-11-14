@@ -1,150 +1,107 @@
-﻿using ReactiveUI;
-using System.Reactive.Disposables;
-using System.Windows;
-using System.Windows.Input;
-using v2rayN.Mode;
-using v2rayN.ViewModels;
+namespace v2rayN.Views;
 
-namespace v2rayN.Views
+public partial class RoutingSettingWindow
 {
-    public partial class RoutingSettingWindow
+    public RoutingSettingWindow()
     {
-        public RoutingSettingWindow()
+        InitializeComponent();
+
+        Closing += RoutingSettingWindow_Closing;
+        PreviewKeyDown += RoutingSettingWindow_PreviewKeyDown;
+        lstRoutings.SelectionChanged += lstRoutings_SelectionChanged;
+        lstRoutings.MouseDoubleClick += LstRoutings_MouseDoubleClick;
+        menuRoutingAdvancedSelectAll.Click += menuRoutingAdvancedSelectAll_Click;
+
+        cmbdomainStrategy.ItemsSource = Global.DomainStrategies;
+        cmbdomainStrategy4Singbox.ItemsSource = Global.DomainStrategies4Sbox;
+
+        this.WhenActivated(disposables =>
         {
-            InitializeComponent();
+            this.OneWayBind(ViewModel, vm => vm.RoutingItems, v => v.lstRoutings.ItemsSource).DisposeWith(disposables);
+            this.Bind(ViewModel, vm => vm.SelectedSource, v => v.lstRoutings.SelectedItem).DisposeWith(disposables);
 
-            // 设置窗口的尺寸不大于屏幕的尺寸
-            if (this.Width > SystemParameters.WorkArea.Width)
+            this.Bind(ViewModel, vm => vm.DomainStrategy, v => v.cmbdomainStrategy.Text).DisposeWith(disposables);
+            this.Bind(ViewModel, vm => vm.DomainStrategy4Singbox, v => v.cmbdomainStrategy4Singbox.Text).DisposeWith(disposables);
+
+            this.BindCommand(ViewModel, vm => vm.RoutingAdvancedAddCmd, v => v.menuRoutingAdvancedAdd).DisposeWith(disposables);
+            this.BindCommand(ViewModel, vm => vm.RoutingAdvancedAddCmd, v => v.menuRoutingAdvancedAdd2).DisposeWith(disposables);
+            this.BindCommand(ViewModel, vm => vm.RoutingAdvancedRemoveCmd, v => v.menuRoutingAdvancedRemove).DisposeWith(disposables);
+            this.BindCommand(ViewModel, vm => vm.RoutingAdvancedSetDefaultCmd, v => v.menuRoutingAdvancedSetDefault).DisposeWith(disposables);
+            this.BindCommand(ViewModel, vm => vm.RoutingAdvancedImportRulesCmd, v => v.menuRoutingAdvancedImportRules).DisposeWith(disposables);
+            this.BindCommand(ViewModel, vm => vm.RoutingAdvancedImportRulesCmd, v => v.menuRoutingAdvancedImportRules2).DisposeWith(disposables);
+
+            ViewModel.ShowYesNoInteraction.RegisterHandler(interaction =>
             {
-                this.Width = SystemParameters.WorkArea.Width;
-            }
-            if (this.Height > SystemParameters.WorkArea.Height)
-            {
-                this.Height = SystemParameters.WorkArea.Height;
-            }
+                var message = interaction.Input;
+                var result = UI.ShowYesNo(message) != MessageBoxResult.No;
+                interaction.SetOutput(result);
+            }).DisposeWith(disposables);
+        });
+        WindowsUtils.SetDarkBorder(this, ConfigTextHandler.Config.UiItem.CurrentTheme);
+    }
 
-            this.Owner = Application.Current.MainWindow;
-            this.Closing += RoutingSettingWindow_Closing;
-            this.PreviewKeyDown += RoutingSettingWindow_PreviewKeyDown;
-            lstRoutings.SelectionChanged += lstRoutings_SelectionChanged;
-            lstRoutings.MouseDoubleClick += LstRoutings_MouseDoubleClick;
-
-            ViewModel = new RoutingSettingViewModel(this);
-
-            Global.domainStrategys.ForEach(it =>
-            {
-                cmbdomainStrategy.Items.Add(it);
-            });
-            Global.domainMatchers.ForEach(it =>
-            {
-                cmbdomainMatcher.Items.Add(it);
-            });
-            Global.domainStrategys4Singbox.ForEach(it =>
-            {
-                cmbdomainStrategy4Singbox.Items.Add(it);
-            });
-
-            this.WhenActivated(disposables =>
-            {
-                this.OneWayBind(ViewModel, vm => vm.RoutingItems, v => v.lstRoutings.ItemsSource).DisposeWith(disposables);
-                this.Bind(ViewModel, vm => vm.SelectedSource, v => v.lstRoutings.SelectedItem).DisposeWith(disposables);
-
-                this.Bind(ViewModel, vm => vm.enableRoutingAdvanced, v => v.togenableRoutingAdvanced.IsChecked).DisposeWith(disposables);
-                this.Bind(ViewModel, vm => vm.domainStrategy, v => v.cmbdomainStrategy.Text).DisposeWith(disposables);
-                this.Bind(ViewModel, vm => vm.domainMatcher, v => v.cmbdomainMatcher.Text).DisposeWith(disposables);
-                this.Bind(ViewModel, vm => vm.domainStrategy4Singbox, v => v.cmbdomainStrategy4Singbox.Text).DisposeWith(disposables);
-
-                this.Bind(ViewModel, vm => vm.ProxyDomain, v => v.txtProxyDomain.Text).DisposeWith(disposables);
-                this.Bind(ViewModel, vm => vm.ProxyIP, v => v.txtProxyIP.Text).DisposeWith(disposables);
-                this.Bind(ViewModel, vm => vm.DirectDomain, v => v.txtDirectDomain.Text).DisposeWith(disposables);
-                this.Bind(ViewModel, vm => vm.DirectIP, v => v.txtDirectIP.Text).DisposeWith(disposables);
-                this.Bind(ViewModel, vm => vm.BlockDomain, v => v.txtBlockDomain.Text).DisposeWith(disposables);
-                this.Bind(ViewModel, vm => vm.BlockIP, v => v.txtBlockIP.Text).DisposeWith(disposables);
-
-                this.OneWayBind(ViewModel, vm => vm.enableRoutingBasic, v => v.menuRoutingBasic.Visibility).DisposeWith(disposables);
-                this.OneWayBind(ViewModel, vm => vm.enableRoutingAdvanced, v => v.menuRoutingAdvanced.Visibility).DisposeWith(disposables);
-                this.OneWayBind(ViewModel, vm => vm.enableRoutingBasic, v => v.tabBasic.Visibility).DisposeWith(disposables);
-                this.OneWayBind(ViewModel, vm => vm.enableRoutingAdvanced, v => v.tabAdvanced.Visibility).DisposeWith(disposables);
-
-                this.BindCommand(ViewModel, vm => vm.RoutingBasicImportRulesCmd, v => v.menuRoutingBasicImportRules).DisposeWith(disposables);
-                this.BindCommand(ViewModel, vm => vm.RoutingAdvancedAddCmd, v => v.menuRoutingAdvancedAdd).DisposeWith(disposables);
-                this.BindCommand(ViewModel, vm => vm.RoutingAdvancedAddCmd, v => v.menuRoutingAdvancedAdd2).DisposeWith(disposables);
-                this.BindCommand(ViewModel, vm => vm.RoutingAdvancedRemoveCmd, v => v.menuRoutingAdvancedRemove).DisposeWith(disposables);
-                this.BindCommand(ViewModel, vm => vm.RoutingAdvancedSetDefaultCmd, v => v.menuRoutingAdvancedSetDefault).DisposeWith(disposables);
-                this.BindCommand(ViewModel, vm => vm.RoutingAdvancedImportRulesCmd, v => v.menuRoutingAdvancedImportRules).DisposeWith(disposables);
-                this.BindCommand(ViewModel, vm => vm.RoutingAdvancedImportRulesCmd, v => v.menuRoutingAdvancedImportRules2).DisposeWith(disposables);
-
-                this.BindCommand(ViewModel, vm => vm.SaveCmd, v => v.btnSave).DisposeWith(disposables);
-            });
+    private void RoutingSettingWindow_Closing(object? sender, System.ComponentModel.CancelEventArgs e)
+    {
+        // DomainStrategy is auto-saved reactively; just ensure the caller knows changes were made
+        if (ViewModel?.IsModified == true)
+        {
+            DialogResult = true;
         }
+    }
 
-        private void RoutingSettingWindow_Closing(object? sender, System.ComponentModel.CancelEventArgs e)
+    private void RoutingSettingWindow_PreviewKeyDown(object sender, KeyEventArgs e)
+    {
+        if (Keyboard.IsKeyDown(Key.LeftCtrl) || Keyboard.IsKeyDown(Key.RightCtrl))
         {
-            if (ViewModel?.IsModified == true)
+            switch (e.Key)
             {
-                this.DialogResult = true;
-            }
-        }
-
-        private void RoutingSettingWindow_PreviewKeyDown(object sender, KeyEventArgs e)
-        {
-            if (ViewModel?.enableRoutingBasic ?? false)
-            {
-                return;
-            }
-
-            if (Keyboard.IsKeyDown(Key.LeftCtrl) || Keyboard.IsKeyDown(Key.RightCtrl))
-            {
-                if (e.Key == Key.A)
-                {
+                case Key.A:
                     lstRoutings.SelectAll();
-                }
-            }
-            else if (e.Key is Key.Enter or Key.Return)
-            {
-                ViewModel?.RoutingAdvancedSetDefault();
-            }
-            else if (e.Key == Key.Delete)
-            {
-                ViewModel?.RoutingAdvancedRemove();
+                    break;
             }
         }
-
-        private void menuRoutingAdvancedSelectAll_Click(object sender, System.Windows.RoutedEventArgs e)
+        else
         {
-            lstRoutings.SelectAll();
-        }
+            switch (e.Key)
+            {
+                case Key.Enter:
+                    //case Key.Return:
+                    ViewModel?.RoutingAdvancedSetDefault();
+                    break;
 
-        private void lstRoutings_SelectionChanged(object sender, System.Windows.Controls.SelectionChangedEventArgs e)
+                case Key.Delete:
+                case Key.Back:
+                    ViewModel?.RoutingAdvancedRemoveAsync();
+                    break;
+            }
+        }
+    }
+
+    private void menuRoutingAdvancedSelectAll_Click(object sender, System.Windows.RoutedEventArgs e)
+    {
+        lstRoutings.SelectAll();
+    }
+
+    private void lstRoutings_SelectionChanged(object sender, System.Windows.Controls.SelectionChangedEventArgs e)
+    {
+        if (ViewModel != null)
         {
             ViewModel.SelectedSources = lstRoutings.SelectedItems.Cast<RoutingItemModel>().ToList();
         }
+    }
 
-        private void LstRoutings_MouseDoubleClick(object sender, MouseButtonEventArgs e)
-        {
-            ViewModel?.RoutingAdvancedEdit(false);
-        }
+    private void LstRoutings_MouseDoubleClick(object sender, MouseButtonEventArgs e)
+    {
+        ViewModel?.RoutingAdvancedEditAsync(false);
+    }
 
-        private void linkdomainStrategy_Click(object sender, System.Windows.RoutedEventArgs e)
-        {
-            Utils.ProcessStart("https://www.v2fly.org/config/routing.html");
-        }
+    private void linkdomainStrategy_Click(object sender, System.Windows.RoutedEventArgs e)
+    {
+        ProcUtils.ProcessStart("https://xtls.github.io/config/routing.html");
+    }
 
-        private void linkdomainStrategy4Singbox_Click(object sender, RoutedEventArgs e)
-        {
-            Utils.ProcessStart("https://sing-box.sagernet.org/zh/configuration/shared/listen/#domain_strategy");
-        }
-
-        private void btnCancel_Click(object sender, System.Windows.RoutedEventArgs e)
-        {
-            if (ViewModel?.IsModified == true)
-            {
-                this.DialogResult = true;
-            }
-            else
-            {
-                this.Close();
-            }
-        }
+    private void linkdomainStrategy4Singbox_Click(object sender, RoutedEventArgs e)
+    {
+        ProcUtils.ProcessStart("https://sing-box.sagernet.org/zh/configuration/route/rule_action/#strategy");
     }
 }

@@ -1,309 +1,413 @@
-﻿using ReactiveUI;
-using System.Reactive.Disposables;
-using System.Windows;
 using System.Windows.Controls;
-using v2rayN.Base;
-using v2rayN.Handler;
-using v2rayN.Mode;
-using v2rayN.Resx;
-using v2rayN.ViewModels;
 
-namespace v2rayN.Views
+namespace v2rayN.Views;
+
+public partial class AddServerWindow
 {
-    public partial class AddServerWindow
+    public AddServerWindow()
     {
-        public AddServerWindow(ProfileItem profileItem)
+        InitializeComponent();
+
+        Loaded += Window_Loaded;
+        cmbNetwork.SelectionChanged += CmbNetwork_SelectionChanged;
+        cmbHeaderTypeRaw.SelectionChanged += CmbHeaderTypeRaw_SelectionChanged;
+        cmbStreamSecurity.SelectionChanged += CmbStreamSecurity_SelectionChanged;
+        btnGUID.Click += btnGUID_Click;
+        btnGUID5.Click += btnGUID_Click;
+
+        cmbCoreType.ItemsSource = Global.CoreTypes.AppendEmpty();
+        cmbNetwork.ItemsSource = Global.Networks;
+
+        cmbHeaderTypeRaw.ItemsSource = new List<string> { Global.None, Global.RawHeaderHttp };
+
+        var kcpHeaderTypes = new List<string> { Global.None };
+        kcpHeaderTypes.AddRange(Global.KcpHeaderTypes);
+        cmbHeaderTypeKcp.ItemsSource = kcpHeaderTypes;
+
+        cmbHeaderTypeXhttp.ItemsSource = Global.XhttpMode;
+        cmbHeaderTypeGrpc.ItemsSource = new List<string> { Global.GrpcGunMode, Global.GrpcMultiMode };
+
+        cmbFingerprint.ItemsSource = Global.Fingerprints;
+        cmbFingerprint2.ItemsSource = Global.Fingerprints;
+        cmbAlpn.ItemsSource = Global.Alpns;
+
+        gridTlsMore.Visibility = Visibility.Collapsed;
+
+        this.WhenActivated(disposables =>
         {
-            InitializeComponent();
+            this.WhenAnyValue(v => v.ViewModel.SelectedSource)
+                .KeepNotNull()
+                .Subscribe(InitializeData)
+                .DisposeWith(disposables);
 
-            // 设置窗口的尺寸不大于屏幕的尺寸
-            if (this.Width > SystemParameters.WorkArea.Width)
-            {
-                this.Width = SystemParameters.WorkArea.Width;
-            }
-            if (this.Height > SystemParameters.WorkArea.Height)
-            {
-                this.Height = SystemParameters.WorkArea.Height;
-            }
+            var configTypeBindings = new SingleReplaceableDisposable();
+            configTypeBindings.DisposeWith(disposables);
 
-            this.Owner = Application.Current.MainWindow;
-            this.Loaded += Window_Loaded;
-            cmbNetwork.SelectionChanged += CmbNetwork_SelectionChanged;
-            cmbStreamSecurity.SelectionChanged += CmbStreamSecurity_SelectionChanged;
+            this.Bind(ViewModel, vm => vm.CoreType, v => v.cmbCoreType.Text).DisposeWith(disposables);
+            this.Bind(ViewModel, vm => vm.SelectedSource.Remarks, v => v.txtRemarks.Text).DisposeWith(disposables);
+            this.Bind(ViewModel, vm => vm.SelectedSource.Address, v => v.txtAddress.Text).DisposeWith(disposables);
+            this.Bind(ViewModel, vm => vm.SelectedSource.Port, v => v.txtPort.Text).DisposeWith(disposables);
 
-            ViewModel = new AddServerViewModel(profileItem, this);
-
-            if (profileItem.configType == EConfigType.VLESS)
-            {
-                Global.coreTypes4VLESS.ForEach(it =>
+            this.WhenAnyValue(v => v.ViewModel.SelectedSource.ConfigType)
+                .Subscribe(configType =>
                 {
-                    cmbCoreType.Items.Add(it);
-                });
-            }
-            else
-            {
-                Global.coreTypes.ForEach(it =>
-                {
-                    cmbCoreType.Items.Add(it);
-                });
-            }
-            cmbCoreType.Items.Add(string.Empty);
+                    var currentTypeDisposables = new MultipleDisposable();
+                    configTypeBindings.Create(currentTypeDisposables);
 
-            cmbStreamSecurity.Items.Add(string.Empty);
-            cmbStreamSecurity.Items.Add(Global.StreamSecurity);
-
-            Global.networks.ForEach(it =>
-            {
-                cmbNetwork.Items.Add(it);
-            });
-            Global.fingerprints.ForEach(it =>
-            {
-                cmbFingerprint.Items.Add(it);
-                cmbFingerprint2.Items.Add(it);
-            });
-            Global.allowInsecures.ForEach(it =>
-            {
-                cmbAllowInsecure.Items.Add(it);
-            });
-            Global.alpns.ForEach(it =>
-            {
-                cmbAlpn.Items.Add(it);
-            });
-
-            switch (profileItem.configType)
-            {
-                case EConfigType.VMess:
-                    gridVMess.Visibility = Visibility.Visible;
-                    Global.vmessSecuritys.ForEach(it =>
+                    switch (configType)
                     {
-                        cmbSecurity.Items.Add(it);
-                    });
-                    if (profileItem.security.IsNullOrEmpty())
-                    {
-                        profileItem.security = Global.DefaultSecurity;
+                        case EConfigType.VMess:
+                            this.Bind(ViewModel, vm => vm.SelectedSource.Password, v => v.txtId.Text).DisposeWith(currentTypeDisposables);
+                            this.Bind(ViewModel, vm => vm.AlterId, v => v.txtAlterId.Text).DisposeWith(currentTypeDisposables);
+                            this.Bind(ViewModel, vm => vm.VmessSecurity, v => v.cmbSecurity.Text).DisposeWith(currentTypeDisposables);
+                            this.Bind(ViewModel, vm => vm.MuxEnabled, v => v.togmuxEnabled.IsChecked).DisposeWith(currentTypeDisposables);
+                            break;
+
+                        case EConfigType.Shadowsocks:
+                            this.Bind(ViewModel, vm => vm.SelectedSource.Password, v => v.txtId3.Text).DisposeWith(currentTypeDisposables);
+                            this.Bind(ViewModel, vm => vm.SsMethod, v => v.cmbSecurity3.Text).DisposeWith(currentTypeDisposables);
+                            this.Bind(ViewModel, vm => vm.Uot, v => v.togUotEnabled3.IsChecked).DisposeWith(currentTypeDisposables);
+                            this.Bind(ViewModel, vm => vm.MuxEnabled, v => v.togmuxEnabled3.IsChecked).DisposeWith(currentTypeDisposables);
+                            break;
+
+                        case EConfigType.SOCKS:
+                            this.Bind(ViewModel, vm => vm.SelectedSource.Password, v => v.txtId4.Text)
+                                .DisposeWith(disposables);
+                            this.Bind(ViewModel, vm => vm.SelectedSource.Username, v => v.txtSecurity4.Text)
+                                .DisposeWith(disposables);
+                            break;
+
+                        case EConfigType.HTTP:
+                            this.Bind(ViewModel, vm => vm.SelectedSource.Password, v => v.txtId4.Text)
+                                .DisposeWith(disposables);
+                            this.Bind(ViewModel, vm => vm.SelectedSource.Username, v => v.txtSecurity4.Text)
+                                .DisposeWith(disposables);
+                            this.Bind(ViewModel, vm => vm.HttpHeadersJson, v => v.txtHttpHeadersJson.Text)
+                                .DisposeWith(disposables);
+                            break;
+
+                        case EConfigType.VLESS:
+                            this.Bind(ViewModel, vm => vm.SelectedSource.Password, v => v.txtId5.Text).DisposeWith(currentTypeDisposables);
+                            this.Bind(ViewModel, vm => vm.Flow, v => v.cmbFlow5.Text).DisposeWith(currentTypeDisposables);
+                            this.Bind(ViewModel, vm => vm.VlessEncryption, v => v.txtSecurity5.Text).DisposeWith(currentTypeDisposables);
+                            this.Bind(ViewModel, vm => vm.MuxEnabled, v => v.togmuxEnabled5.IsChecked).DisposeWith(currentTypeDisposables);
+                            break;
+
+                        case EConfigType.Trojan:
+                            this.Bind(ViewModel, vm => vm.SelectedSource.Password, v => v.txtId6.Text).DisposeWith(currentTypeDisposables);
+                            this.Bind(ViewModel, vm => vm.Flow, v => v.cmbFlow6.Text).DisposeWith(currentTypeDisposables);
+                            this.Bind(ViewModel, vm => vm.MuxEnabled, v => v.togmuxEnabled6.IsChecked).DisposeWith(currentTypeDisposables);
+                            break;
+
+                        case EConfigType.Hysteria2:
+                            this.Bind(ViewModel, vm => vm.SelectedSource.Password, v => v.txtId7.Text).DisposeWith(currentTypeDisposables);
+                            this.Bind(ViewModel, vm => vm.SalamanderPass, v => v.txtPath7.Text).DisposeWith(currentTypeDisposables);
+                            this.Bind(ViewModel, vm => vm.Ports, v => v.txtPorts7.Text).DisposeWith(currentTypeDisposables);
+                            this.Bind(ViewModel, vm => vm.HopInterval, v => v.txtHopInt7.Text).DisposeWith(currentTypeDisposables);
+                            this.Bind(ViewModel, vm => vm.UpMbps, v => v.txtUpMbps7.Text).DisposeWith(currentTypeDisposables);
+                            this.Bind(ViewModel, vm => vm.DownMbps, v => v.txtDownMbps7.Text).DisposeWith(currentTypeDisposables);
+                            this.Bind(ViewModel, vm => vm.Hy2RealmUrl, v => v.txtHy2RealmUrl.Text).DisposeWith(currentTypeDisposables);
+                            this.Bind(ViewModel, vm => vm.GeckoMinPacketSize, v => v.txtMinGeckoPacketSize.Text).DisposeWith(currentTypeDisposables);
+                            this.Bind(ViewModel, vm => vm.GeckoMaxPacketSize, v => v.txtMaxGeckoPacketSize.Text).DisposeWith(currentTypeDisposables);
+                            break;
+
+                        case EConfigType.TUIC:
+                            this.Bind(ViewModel, vm => vm.SelectedSource.Username, v => v.txtId8.Text).DisposeWith(currentTypeDisposables);
+                            this.Bind(ViewModel, vm => vm.SelectedSource.Password, v => v.txtSecurity8.Text).DisposeWith(currentTypeDisposables);
+                            this.Bind(ViewModel, vm => vm.CongestionControl, v => v.cmbCongestionControl8.Text).DisposeWith(currentTypeDisposables);
+                            break;
+
+                        case EConfigType.WireGuard:
+                            this.Bind(ViewModel, vm => vm.SelectedSource.Password, v => v.txtId9.Text).DisposeWith(currentTypeDisposables);
+                            this.Bind(ViewModel, vm => vm.WgPublicKey, v => v.txtPublicKey9.Text).DisposeWith(currentTypeDisposables);
+                            this.Bind(ViewModel, vm => vm.WgPresharedKey, v => v.txtPreSharedKey9.Text).DisposeWith(currentTypeDisposables);
+                            this.Bind(ViewModel, vm => vm.WgReserved, v => v.txtPath9.Text).DisposeWith(currentTypeDisposables);
+                            this.Bind(ViewModel, vm => vm.WgInterfaceAddress, v => v.txtRequestHost9.Text).DisposeWith(currentTypeDisposables);
+                            this.Bind(ViewModel, vm => vm.WgMtu, v => v.txtShortId9.Text).DisposeWith(currentTypeDisposables);
+                            this.Bind(ViewModel, vm => vm.WgDns, v => v.txtDns.Text).DisposeWith(currentTypeDisposables);
+                            break;
+
+                        case EConfigType.Anytls:
+                            this.Bind(ViewModel, vm => vm.SelectedSource.Password, v => v.txtId11.Text).DisposeWith(currentTypeDisposables);
+                            break;
+
+                        case EConfigType.Naive:
+                            this.Bind(ViewModel, vm => vm.SelectedSource.Username, v => v.txtId12.Text).DisposeWith(currentTypeDisposables);
+                            this.Bind(ViewModel, vm => vm.SelectedSource.Password, v => v.txtSecurity12.Text).DisposeWith(currentTypeDisposables);
+                            this.Bind(ViewModel, vm => vm.NaiveQuic, v => v.togNaiveQuic12.IsChecked).DisposeWith(currentTypeDisposables);
+                            this.Bind(ViewModel, vm => vm.CongestionControl, v => v.cmbCongestionControl12.Text).DisposeWith(currentTypeDisposables);
+                            this.Bind(ViewModel, vm => vm.InsecureConcurrency, v => v.txtInsecureConcurrency12.Text).DisposeWith(currentTypeDisposables);
+                            this.Bind(ViewModel, vm => vm.Uot, v => v.togUotEnabled12.IsChecked).DisposeWith(currentTypeDisposables);
+                            break;
+
+                        case EConfigType.MASQUE:
+                            this.Bind(ViewModel, vm => vm.SelectedSource.Username, v => v.txtId14.Text).DisposeWith(currentTypeDisposables);
+                            this.Bind(ViewModel, vm => vm.SelectedSource.Password, v => v.txtSecurity14.Text).DisposeWith(currentTypeDisposables);
+                            this.Bind(ViewModel, vm => vm.MasquePath, v => v.txtPath14.Text).DisposeWith(currentTypeDisposables);
+                            this.Bind(ViewModel, vm => vm.MasqueHeaders, v => v.txtHeaders14.Text).DisposeWith(currentTypeDisposables);
+                            this.Bind(ViewModel, vm => vm.WarpPublicKey, v => v.txtWarpPublicKey.Text).DisposeWith(currentTypeDisposables);
+                            this.Bind(ViewModel, vm => vm.WarpPrivateKey, v => v.txtWarpPrivateKey.Text).DisposeWith(currentTypeDisposables);
+                            this.Bind(ViewModel, vm => vm.WarpAddress, v => v.txtWarpAddress.Text).DisposeWith(currentTypeDisposables);
+                            break;
                     }
-                    break;
+                })
+                .DisposeWith(disposables);
 
-                case EConfigType.Shadowsocks:
-                    gridSs.Visibility = Visibility.Visible;
-                    LazyConfig.Instance.GetShadowsocksSecuritys(profileItem).ForEach(it =>
-                    {
-                        cmbSecurity3.Items.Add(it);
-                    });
-                    break;
+            this.Bind(ViewModel, vm => vm.Network, v => v.cmbNetwork.Text).DisposeWith(disposables);
+            this.Bind(ViewModel, vm => vm.RawHeaderType, v => v.cmbHeaderTypeRaw.Text).DisposeWith(disposables);
+            this.Bind(ViewModel, vm => vm.Host, v => v.txtRequestHostRaw.Text).DisposeWith(disposables);
+            this.Bind(ViewModel, vm => vm.Path, v => v.txtPathRaw.Text).DisposeWith(disposables);
 
-                case EConfigType.Socks:
-                    gridSocks.Visibility = Visibility.Visible;
-                    break;
+            this.Bind(ViewModel, vm => vm.KcpHeaderType, v => v.cmbHeaderTypeKcp.Text).DisposeWith(disposables);
+            this.Bind(ViewModel, vm => vm.KcpSeed, v => v.txtKcpSeed.Text).DisposeWith(disposables);
+            this.Bind(ViewModel, vm => vm.KcpMtu, v => v.txtKcpMtu.Text).DisposeWith(disposables);
 
-                case EConfigType.VLESS:
-                    gridVLESS.Visibility = Visibility.Visible;
-                    cmbStreamSecurity.Items.Add(Global.StreamSecurityReality);
-                    Global.flows.ForEach(it =>
-                    {
-                        cmbFlow5.Items.Add(it);
-                    });
-                    if (profileItem.security.IsNullOrEmpty())
-                    {
-                        profileItem.security = Global.None;
-                    }
-                    break;
+            this.Bind(ViewModel, vm => vm.Host, v => v.txtRequestHostWs.Text).DisposeWith(disposables);
+            this.Bind(ViewModel, vm => vm.Path, v => v.txtPathWs.Text).DisposeWith(disposables);
 
-                case EConfigType.Trojan:
-                    gridTrojan.Visibility = Visibility.Visible;
-                    cmbStreamSecurity.Items.Add(Global.StreamSecurityReality);
-                    Global.flows.ForEach(it =>
-                    {
-                        cmbFlow6.Items.Add(it);
-                    });
-                    break;
-            }
+            this.Bind(ViewModel, vm => vm.Host, v => v.txtRequestHostHttpupgrade.Text).DisposeWith(disposables);
+            this.Bind(ViewModel, vm => vm.Path, v => v.txtPathHttpupgrade.Text).DisposeWith(disposables);
 
-            gridTlsMore.Visibility = Visibility.Hidden;
+            this.Bind(ViewModel, vm => vm.XhttpMode, v => v.cmbHeaderTypeXhttp.Text).DisposeWith(disposables);
+            this.Bind(ViewModel, vm => vm.Host, v => v.txtRequestHostXhttp.Text).DisposeWith(disposables);
+            this.Bind(ViewModel, vm => vm.Path, v => v.txtPathXhttp.Text).DisposeWith(disposables);
+            this.Bind(ViewModel, vm => vm.XhttpExtra, v => v.txtExtraXhttp.Text).DisposeWith(disposables);
 
-            this.WhenActivated(disposables =>
-            {
-                this.Bind(ViewModel, vm => vm.SelectedSource.coreType, v => v.cmbCoreType.Text).DisposeWith(disposables);
-                this.Bind(ViewModel, vm => vm.SelectedSource.remarks, v => v.txtRemarks.Text).DisposeWith(disposables);
-                this.Bind(ViewModel, vm => vm.SelectedSource.address, v => v.txtAddress.Text).DisposeWith(disposables);
-                this.Bind(ViewModel, vm => vm.SelectedSource.port, v => v.txtPort.Text).DisposeWith(disposables);
+            this.Bind(ViewModel, vm => vm.GrpcMode, v => v.cmbHeaderTypeGrpc.Text).DisposeWith(disposables);
+            this.Bind(ViewModel, vm => vm.GrpcAuthority, v => v.txtRequestHostGrpc.Text).DisposeWith(disposables);
+            this.Bind(ViewModel, vm => vm.GrpcServiceName, v => v.txtPathGrpc.Text).DisposeWith(disposables);
 
-                switch (profileItem.configType)
-                {
-                    case EConfigType.VMess:
-                        this.Bind(ViewModel, vm => vm.SelectedSource.id, v => v.txtId.Text).DisposeWith(disposables);
-                        this.Bind(ViewModel, vm => vm.SelectedSource.alterId, v => v.txtAlterId.Text).DisposeWith(disposables);
-                        this.Bind(ViewModel, vm => vm.SelectedSource.security, v => v.cmbSecurity.Text).DisposeWith(disposables);
-                        break;
+            this.Bind(ViewModel, vm => vm.SelectedSource.StreamSecurity, v => v.cmbStreamSecurity.Text).DisposeWith(disposables);
+            this.Bind(ViewModel, vm => vm.SelectedSource.Sni, v => v.txtSNI.Text).DisposeWith(disposables);
+            this.Bind(ViewModel, vm => vm.AllowInsecure, v => v.togAllowInsecure.IsChecked).DisposeWith(disposables);
+            this.Bind(ViewModel, vm => vm.SelectedSource.Fingerprint, v => v.cmbFingerprint.Text).DisposeWith(disposables);
+            this.Bind(ViewModel, vm => vm.SelectedSource.Alpn, v => v.cmbAlpn.Text).DisposeWith(disposables);
+            this.Bind(ViewModel, vm => vm.CertSha, v => v.txtCertSha256Pinning.Text).DisposeWith(disposables);
+            this.Bind(ViewModel, vm => vm.CertTip, v => v.labCertPinning.Text).DisposeWith(disposables);
+            this.Bind(ViewModel, vm => vm.Cert, v => v.txtCert.Text).DisposeWith(disposables);
+            this.Bind(ViewModel, vm => vm.Cert, v => v.txtCert.Text).DisposeWith(disposables);
+            this.Bind(ViewModel, vm => vm.SelectedSource.EchConfigList, v => v.txtEchConfigList.Text).DisposeWith(disposables);
+            this.Bind(ViewModel, vm => vm.SelectedSource.VerifyPeerCertByName, v => v.txtVerifyPeerCertByName.Text).DisposeWith(disposables);
 
-                    case EConfigType.Shadowsocks:
-                        this.Bind(ViewModel, vm => vm.SelectedSource.id, v => v.txtId3.Text).DisposeWith(disposables);
-                        this.Bind(ViewModel, vm => vm.SelectedSource.security, v => v.cmbSecurity3.Text).DisposeWith(disposables);
-                        break;
+            //reality
+            this.Bind(ViewModel, vm => vm.SelectedSource.Sni, v => v.txtSNI2.Text).DisposeWith(disposables);
+            this.Bind(ViewModel, vm => vm.SelectedSource.Fingerprint, v => v.cmbFingerprint2.Text).DisposeWith(disposables);
+            this.Bind(ViewModel, vm => vm.SelectedSource.PublicKey, v => v.txtPublicKey.Text).DisposeWith(disposables);
+            this.Bind(ViewModel, vm => vm.SelectedSource.ShortId, v => v.txtShortId.Text).DisposeWith(disposables);
+            this.Bind(ViewModel, vm => vm.SelectedSource.SpiderX, v => v.txtSpiderX.Text).DisposeWith(disposables);
+            this.Bind(ViewModel, vm => vm.SelectedSource.Mldsa65Verify, v => v.txtMldsa65Verify.Text).DisposeWith(disposables);
 
-                    case EConfigType.Socks:
-                        this.Bind(ViewModel, vm => vm.SelectedSource.id, v => v.txtId4.Text).DisposeWith(disposables);
-                        this.Bind(ViewModel, vm => vm.SelectedSource.security, v => v.txtSecurity4.Text).DisposeWith(disposables);
-                        break;
+            this.Bind(ViewModel, vm => vm.SelectedSource.Finalmask, v => v.txtFinalmask.Text).DisposeWith(disposables);
 
-                    case EConfigType.VLESS:
-                        this.Bind(ViewModel, vm => vm.SelectedSource.id, v => v.txtId5.Text).DisposeWith(disposables);
-                        this.Bind(ViewModel, vm => vm.SelectedSource.flow, v => v.cmbFlow5.Text).DisposeWith(disposables);
-                        this.Bind(ViewModel, vm => vm.SelectedSource.security, v => v.txtSecurity5.Text).DisposeWith(disposables);
-                        break;
+            this.BindCommand(ViewModel, vm => vm.FetchCertCmd, v => v.btnFetchCert).DisposeWith(disposables);
+            this.BindCommand(ViewModel, vm => vm.FetchCertChainCmd, v => v.btnFetchCertChain).DisposeWith(disposables);
+            this.BindCommand(ViewModel, vm => vm.SaveCmd, v => v.btnSave).DisposeWith(disposables);
+        });
 
-                    case EConfigType.Trojan:
-                        this.Bind(ViewModel, vm => vm.SelectedSource.id, v => v.txtId6.Text).DisposeWith(disposables);
-                        this.Bind(ViewModel, vm => vm.SelectedSource.flow, v => v.cmbFlow6.Text).DisposeWith(disposables);
-                        break;
-                }
-                this.Bind(ViewModel, vm => vm.SelectedSource.network, v => v.cmbNetwork.Text).DisposeWith(disposables);
-                this.Bind(ViewModel, vm => vm.SelectedSource.headerType, v => v.cmbHeaderType.Text).DisposeWith(disposables);
-                this.Bind(ViewModel, vm => vm.SelectedSource.requestHost, v => v.txtRequestHost.Text).DisposeWith(disposables);
-                this.Bind(ViewModel, vm => vm.SelectedSource.path, v => v.txtPath.Text).DisposeWith(disposables);
+        WindowsUtils.SetDarkBorder(this, ConfigTextHandler.Config.UiItem.CurrentTheme);
+    }
 
-                this.Bind(ViewModel, vm => vm.SelectedSource.streamSecurity, v => v.cmbStreamSecurity.Text).DisposeWith(disposables);
-                this.Bind(ViewModel, vm => vm.SelectedSource.sni, v => v.txtSNI.Text).DisposeWith(disposables);
-                this.Bind(ViewModel, vm => vm.SelectedSource.allowInsecure, v => v.cmbAllowInsecure.Text).DisposeWith(disposables);
-                this.Bind(ViewModel, vm => vm.SelectedSource.fingerprint, v => v.cmbFingerprint.Text).DisposeWith(disposables);
-                this.Bind(ViewModel, vm => vm.SelectedSource.alpn, v => v.cmbAlpn.Text).DisposeWith(disposables);
-                //reality
-                this.Bind(ViewModel, vm => vm.SelectedSource.sni, v => v.txtSNI2.Text).DisposeWith(disposables);
-                this.Bind(ViewModel, vm => vm.SelectedSource.fingerprint, v => v.cmbFingerprint2.Text).DisposeWith(disposables);
-                this.Bind(ViewModel, vm => vm.SelectedSource.publicKey, v => v.txtPublicKey.Text).DisposeWith(disposables);
-                this.Bind(ViewModel, vm => vm.SelectedSource.shortId, v => v.txtShortId.Text).DisposeWith(disposables);
-                this.Bind(ViewModel, vm => vm.SelectedSource.spiderX, v => v.txtSpiderX.Text).DisposeWith(disposables);
-
-                this.BindCommand(ViewModel, vm => vm.SaveCmd, v => v.btnSave).DisposeWith(disposables);
-            });
-
-            this.Title = $"{profileItem.configType}";
-        }
-
-        private void Window_Loaded(object sender, RoutedEventArgs e)
+    private void InitializeData(ProfileItem profileItem)
+    {
+        Title = $"{profileItem.ConfigType}";
+        var lstStreamSecurity = new List<string> { string.Empty, Global.StreamSecurity };
+        switch (profileItem.ConfigType)
         {
-            txtRemarks.Focus();
-        }
+            case EConfigType.VMess:
+                gridVMess.Visibility = Visibility.Visible;
+                cmbSecurity.ItemsSource = Global.VmessSecurities;
+                break;
 
-        private void CmbNetwork_SelectionChanged(object sender, SelectionChangedEventArgs e)
+            case EConfigType.Shadowsocks:
+                gridSs.Visibility = Visibility.Visible;
+                cmbSecurity3.ItemsSource = AppManager.Instance.GetShadowsocksSecurities(profileItem);
+                break;
+
+            case EConfigType.SOCKS:
+                gridSocks.Visibility = Visibility.Visible;
+                break;
+
+            case EConfigType.HTTP:
+                gridSocks.Visibility = Visibility.Visible;
+                tbHttpHeaders.Visibility = Visibility.Visible;
+                txtHttpHeadersJson.Visibility = Visibility.Visible;
+                break;
+
+            case EConfigType.VLESS:
+                gridVLESS.Visibility = Visibility.Visible;
+                lstStreamSecurity.Add(Global.StreamSecurityReality);
+                cmbFlow5.ItemsSource = Global.Flows;
+                break;
+
+            case EConfigType.Trojan:
+                gridTrojan.Visibility = Visibility.Visible;
+                lstStreamSecurity.Add(Global.StreamSecurityReality);
+                cmbFlow6.ItemsSource = Global.Flows;
+                break;
+
+            case EConfigType.Hysteria2:
+                gridHysteria2.Visibility = Visibility.Visible;
+                sepa2.Visibility = Visibility.Collapsed;
+                gridTransport.Visibility = Visibility.Collapsed;
+                cmbFingerprint.IsEnabled = false;
+                cmbAlpn.IsEnabled = false;
+                break;
+
+            case EConfigType.TUIC:
+                gridTuic.Visibility = Visibility.Visible;
+                sepa2.Visibility = Visibility.Collapsed;
+                gridTransport.Visibility = Visibility.Collapsed;
+                cmbCoreType.IsEnabled = false;
+                cmbFingerprint.IsEnabled = false;
+                gridFinalmask.Visibility = Visibility.Collapsed;
+
+                cmbCongestionControl8.ItemsSource = Global.TuicCongestionControls;
+                break;
+
+            case EConfigType.WireGuard:
+                gridWireguard.Visibility = Visibility.Visible;
+
+                sepa2.Visibility = Visibility.Collapsed;
+                gridTransport.Visibility = Visibility.Collapsed;
+                gridTls.Visibility = Visibility.Collapsed;
+
+                break;
+
+            case EConfigType.Anytls:
+                gridAnytls.Visibility = Visibility.Visible;
+                sepa2.Visibility = Visibility.Collapsed;
+                gridTransport.Visibility = Visibility.Collapsed;
+                cmbCoreType.IsEnabled = false;
+                lstStreamSecurity.Add(Global.StreamSecurityReality);
+                gridFinalmask.Visibility = Visibility.Collapsed;
+                break;
+
+            case EConfigType.Naive:
+                gridNaive.Visibility = Visibility.Visible;
+                sepa2.Visibility = Visibility.Collapsed;
+                gridTransport.Visibility = Visibility.Collapsed;
+                cmbCoreType.IsEnabled = false;
+                gridFinalmask.Visibility = Visibility.Collapsed;
+                cmbFingerprint.IsEnabled = false;
+                cmbAlpn.IsEnabled = false;
+                togAllowInsecure.IsEnabled = false;
+
+                cmbCongestionControl12.ItemsSource = Global.NaiveCongestionControls;
+                break;
+
+            case EConfigType.MASQUE:
+                gridMasque.Visibility = Visibility.Visible;
+                sepa2.Visibility = Visibility.Collapsed;
+                gridTransport.Visibility = Visibility.Collapsed;
+                break;
+        }
+        cmbStreamSecurity.ItemsSource = lstStreamSecurity;
+        cmbStreamSecurity.SelectedItem = profileItem.StreamSecurity;
+    }
+
+    private void Window_Loaded(object sender, RoutedEventArgs e)
+    {
+        txtRemarks.Focus();
+    }
+
+    private void CmbNetwork_SelectionChanged(object sender, SelectionChangedEventArgs e)
+    {
+        SetTransportGridVisibility();
+    }
+
+    private void CmbHeaderTypeRaw_SelectionChanged(object sender, SelectionChangedEventArgs e)
+    {
+        SetRawHttpFieldsVisibility();
+    }
+
+    private void CmbStreamSecurity_SelectionChanged(object sender, SelectionChangedEventArgs e)
+    {
+        var security = cmbStreamSecurity.SelectedItem.ToString();
+        if (security == Global.StreamSecurityReality)
         {
-            SetHeaderType();
-            SetTips();
+            gridRealityMore.Visibility = Visibility.Visible;
+            gridTlsMore.Visibility = Visibility.Collapsed;
         }
-
-        private void CmbStreamSecurity_SelectionChanged(object sender, SelectionChangedEventArgs e)
+        else if (security == Global.StreamSecurity)
         {
-            var security = cmbStreamSecurity.SelectedItem.ToString();
-            if (security == Global.StreamSecurityReality)
-            {
-                gridRealityMore.Visibility = Visibility.Visible;
-                gridTlsMore.Visibility = Visibility.Hidden;
-            }
-            else if (security == Global.StreamSecurity)
-            {
-                gridRealityMore.Visibility = Visibility.Hidden;
-                gridTlsMore.Visibility = Visibility.Visible;
-            }
-            else
-            {
-                gridRealityMore.Visibility = Visibility.Hidden;
-                gridTlsMore.Visibility = Visibility.Hidden;
-            }
+            gridRealityMore.Visibility = Visibility.Collapsed;
+            gridTlsMore.Visibility = Visibility.Visible;
         }
-
-        private void btnGUID_Click(object sender, RoutedEventArgs e)
+        else
         {
-            txtId.Text =
-            txtId5.Text = Utils.GetGUID();
+            gridRealityMore.Visibility = Visibility.Collapsed;
+            gridTlsMore.Visibility = Visibility.Collapsed;
         }
+    }
 
-        private void SetHeaderType()
+    private void btnGUID_Click(object sender, RoutedEventArgs e)
+    {
+        txtId.Text =
+        txtId5.Text = Utils.GetGuid();
+    }
+
+    private void SetTransportGridVisibility()
+    {
+        var network = cmbNetwork.SelectedItem?.ToString();
+        if (network.IsNullOrEmpty())
         {
-            cmbHeaderType.Items.Clear();
-
-            var network = cmbNetwork.SelectedItem.ToString();
-            if (Utils.IsNullOrEmpty(network))
-            {
-                cmbHeaderType.Items.Add(Global.None);
-                return;
-            }
-
-            if (network == Global.DefaultNetwork)
-            {
-                cmbHeaderType.Items.Add(Global.None);
-                cmbHeaderType.Items.Add(Global.TcpHeaderHttp);
-            }
-            else if (network is "kcp" or "quic")
-            {
-                cmbHeaderType.Items.Add(Global.None);
-                Global.kcpHeaderTypes.ForEach(it =>
-                {
-                    cmbHeaderType.Items.Add(it);
-                });
-            }
-            else if (network == "grpc")
-            {
-                cmbHeaderType.Items.Add(Global.GrpcgunMode);
-                cmbHeaderType.Items.Add(Global.GrpcmultiMode);
-            }
-            else
-            {
-                cmbHeaderType.Items.Add(Global.None);
-            }
-            cmbHeaderType.SelectedIndex = 0;
+            network = Global.DefaultNetwork;
         }
 
-        private void SetTips()
+        gridTransportRaw.Visibility = Visibility.Collapsed;
+        gridTransportKcp.Visibility = Visibility.Collapsed;
+        gridTransportWs.Visibility = Visibility.Collapsed;
+        gridTransportHttpupgrade.Visibility = Visibility.Collapsed;
+        gridTransportXhttp.Visibility = Visibility.Collapsed;
+        gridTransportGrpc.Visibility = Visibility.Collapsed;
+
+        switch (network)
         {
-            var network = cmbNetwork.SelectedItem.ToString();
-            if (Utils.IsNullOrEmpty(network))
-            {
-                network = Global.DefaultNetwork;
-            }
-            labHeaderType.Visibility = Visibility.Visible;
-            tipRequestHost.Text =
-            tipPath.Text =
-            tipHeaderType.Text = string.Empty;
+            case nameof(ETransport.raw):
+                gridTransportRaw.Visibility = Visibility.Visible;
+                break;
 
-            switch (network)
-            {
-                case Global.DefaultNetwork:
-                    tipRequestHost.Text = ResUI.TransportRequestHostTip1;
-                    tipHeaderType.Text = ResUI.TransportHeaderTypeTip1;
-                    break;
+            case nameof(ETransport.kcp):
+                gridTransportKcp.Visibility = Visibility.Visible;
+                break;
 
-                case "kcp":
-                    tipHeaderType.Text = ResUI.TransportHeaderTypeTip2;
-                    tipPath.Text = ResUI.TransportPathTip5;
-                    break;
+            case nameof(ETransport.ws):
+                gridTransportWs.Visibility = Visibility.Visible;
+                break;
 
-                case "ws":
-                    tipRequestHost.Text = ResUI.TransportRequestHostTip2;
-                    tipPath.Text = ResUI.TransportPathTip1;
-                    break;
+            case nameof(ETransport.httpupgrade):
+                gridTransportHttpupgrade.Visibility = Visibility.Visible;
+                break;
 
-                case "h2":
-                    tipRequestHost.Text = ResUI.TransportRequestHostTip3;
-                    tipPath.Text = ResUI.TransportPathTip2;
-                    break;
+            case nameof(ETransport.xhttp):
+                gridTransportXhttp.Visibility = Visibility.Visible;
+                break;
 
-                case "quic":
-                    tipRequestHost.Text = ResUI.TransportRequestHostTip4;
-                    tipPath.Text = ResUI.TransportPathTip3;
-                    tipHeaderType.Text = ResUI.TransportHeaderTypeTip3;
-                    break;
+            case nameof(ETransport.grpc):
+                gridTransportGrpc.Visibility = Visibility.Visible;
+                break;
 
-                case "grpc":
-                    tipPath.Text = ResUI.TransportPathTip4;
-                    tipHeaderType.Text = ResUI.TransportHeaderTypeTip4;
-                    labHeaderType.Visibility = Visibility.Hidden;
-                    break;
-            }
+            default:
+                gridTransportRaw.Visibility = Visibility.Visible;
+                break;
         }
 
-        private void btnCancel_Click(object sender, RoutedEventArgs e)
+        SetRawHttpFieldsVisibility();
+    }
+
+    private void SetRawHttpFieldsVisibility()
+    {
+        var network = cmbNetwork.SelectedItem?.ToString();
+        if (network.IsNullOrEmpty())
         {
-            this.Close();
+            network = Global.DefaultNetwork;
         }
+
+        var rawHeaderType = cmbHeaderTypeRaw.SelectedItem?.ToString();
+        var showRawHttpFields = network == nameof(ETransport.raw)
+                                && rawHeaderType == Global.RawHeaderHttp;
+        gridTransportRawHttp.Visibility = showRawHttpFields
+            ? Visibility.Visible
+            : Visibility.Collapsed;
     }
 }
